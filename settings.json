@@ -1,0 +1,18 @@
+{
+	"bots": {
+		"1": {
+			"name": "darkbean",
+			"start": "/bots/darkbeanbot/bot.js",
+			"log": "/home/mike/.forever/darkbean.log",
+			"error_log": "/home/mike/.forever/darkbean.error.log",
+			"out_log": "/home/mike/.forever/darkbean.out.log"
+		},
+		"2": {
+			"name": "statbot",
+			"start": "/bots/statBot/bot.js",
+			"log": "/home/mike/.forever/statbot.log",
+			"error": "/home/mike/.forever/statbot.error.log",
+			"out_log": "/home/mike/.forever/statbot.out.log"
+		}
+	}
+}
