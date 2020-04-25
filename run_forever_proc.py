@@ -11,31 +11,58 @@ import sys
 import logging
 from pathlib import Path
 
-# Toggle tests and debug values.
-TEST = True
-DEBUG = True
+DEBUG = True    # Toggle DEBUG options.
 
 def readJson(file_path):
     if not os.path.exists(file_path):
         logger.error()
         return False
 
+
+def setup_logger(level, path):
+    # Change the logging format below..
+    log_format = "%(asctime)s - %(levelname)s - %(message)s"
+    try:
+        # Check the different cases, default: DEBUG
+        if level.upper() == "DEBUG":
+            logging.basicConfig(filename=path, level=logging.DEBUG, format=log_format)
+        elif level.upper() == "INFO":
+            logging.basicConfig(filename=path, level=logging.INFO, format=log_format)
+        elif level.upper() == "ERROR":
+            logging.basicConfig(filename=path, level=logging.ERROR, format=log_format)
+        else:
+            logging.basicConfig(filename=path, level=logging.DEBUG, format=log_format)
+        return logging.getLogger()
+    except Exception as ex:
+        print(f"Could not setup the logger, exiting the program.\nError: {ex}")
+        sys.exit(1)
+
+
 class Service:
-    def __init__(self):
-        pass
-
-    def isUp(self):
-        """´
-        Check if the service is running.
-        :para self: self.storage
-        :return: Bool
+    def isUp(self, daemon):
         """
-        # TODO: out is literally garbage.. Output needs to be fixed ASAP..
-        out = os.system("forever list | grep /bots/statBot/bot.js")
-        print(out)
+        Check if the service/daemon is running or not.
+        """
+        cmd = f"forever list | grep {daemon} >> /dev/null"  # Command to execute.
+        out = os.system(cmd)
+        if out == 0:
+            msg = f"Daemon [{daemon}] is running"
+            is_up =  True
+        elif out == 256:
+            msg = f"Daemon [{daemon}] is not running"
+            is_up = False
+        else:
+            msg = "Something went wrong.."
+            is_up = False
+        # Try if logging is possible.. only used for tests.
+        try:
+            logger.debug(f"Command: {cmd}, out={out}")
+            logger.info(msg)
+        finally:
+            return is_up
 
 
-class App:
+class Program:
     def __init__(self, settings, home_dir):
         self.SETTINGS = settings
         self.HOME = home_dir
@@ -43,18 +70,15 @@ class App:
     def start(self):
         # Check if the settings file.
         if not os.path.exists(self.SETTINGS):
-            logger.error(f"Settings file doesn't exist, make sure the path is correct and the file exists. [{settings}]\nExiting script.")
+            logger.error(f"Settings file doesn't exist, make sure the path is correct and the file exists. [{self.SETTINGS}]\nExiting script.")
             sys.exit(1)
+        # Load the settings.
         readJson(self.SETTINGS)
-
-
-# Class for service tests.
-class TestService:
-    def __init__(self):
-        self.service = Service()
-
-    def test_isUp(self):
-        self.service.isUp()
+        service = Service()
+        if service.isUp("bot.js") == True:
+            print("Done")
+        else:
+            print("Error")
 
 
 if __name__ == '__main__':
@@ -62,33 +86,23 @@ if __name__ == '__main__':
     HOME_DIR = str(Path.home())
 
     # Check if debug mode is active or not.
+    # Debugging mode changes paths and logging levels..
     if DEBUG == True:
-        print("DEBUGGING IS ENABLED!!!\n")
+        LOG_LEVEL = "DEBUG"
         LOGGING_PATH = "./forever_proc.log"
         SETTINGS_PATH = "./settings.json"
     else:
-        # Change paths if needed.
-        LOGGING_PATH = "/var/log/forever_proc.log"
+        LOG_LEVEL = "INFO"
+        LOGGING_PATH = f"{HOME_DIR}/forever_proc.log"
         SETTINGS_PATH = f"{HOME_DIR}/.config/forever_proc/settings.json"
 
-    try:
-        log_format = "%(asctime)s - %(levelname)s - %(message)s"
-        logging.basicConfig(filename=LOGGING_PATH, level=logging.DEBUG, format=log_format)
-        logger = logging.getLogger()
-    except:
-        print("Could not setup the logger, exiting the program.")
-        sys.exit(1)
+    logger = setup_logger(LOG_LEVEL, LOGGING_PATH)
+    logger.debug(f"[SYSTEM_INFO]\nHOME_DIR: {HOME_DIR}\nDEBUG: {str(DEBUG)}\nLOG_LEVEL: {LOG_LEVEL}\nLOGGING_PATH: {LOGGING_PATH}\nSETTINGS_PATH: {SETTINGS_PATH}")
 
-    # Check if tests are enabled.
-    if TEST == True:
-        logger.info("TESTS ARE ACTIVE!")
-        # Write test cases below..
-
-        logger.info("isUp tests started..")
-        TestService().test_isUp()
-        logger.info("isUp tests finished..")
-    else:
-        # Initialize the program and run it.
-        app = App(SETTINGS_PATH, HOME_DIR)
-        app.start()
+    # Initialize the program and start it.
+    prog = Program(
+        SETTINGS_PATH, 
+        HOME_DIR
+    )
+    prog.start()
     sys.exit(0)
