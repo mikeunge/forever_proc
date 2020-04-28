@@ -1,5 +1,5 @@
 {
-	"bots": {
+	"jobs": {
 		"1": {
 			"name": "darkbean",
 			"start": "/bots/darkbeanbot/bot.js",
