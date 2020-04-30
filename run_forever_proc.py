@@ -13,55 +13,9 @@ import logging
 from pathlib import Path
 
 
-def readJson(path):
-	"""
-	Read the passed json file and return the content (dict).
-	"""
-	data = False
-	if not os.path.exists(path):
-		# File does not exist.
-		logger.error(f"File does not exist, please make sure the path is correct and the file exists.. [{path}]")
-	else:
-		# Check if the file is empty.
-		if os.stat(path).st_size == 0:
-			# The file is empty..
-			logger.error(f"File is empty, please check the content or given file.. [{path}]")
-		else:
-			try:
-				# Open the file and read the content to data.
-				with open(path, "r") as file:
-					data = json.load(file)
-			except IOError as io:
-				logger.error(f"File is currently busy, please close the json file and try it again. [{path}]")
-			except Exception as ex:
-				logger.error(f"Something unexpected happened, please try again.\nError: {ex}", 1)
-	return data
-
-
-def setup_logger(level, path):
-	# Change the logging format below..
-	log_format = "%(asctime)s - %(levelname)s - %(message)s"
-	try:
-		# Check the different cases, default: DEBUG
-		if level.upper() == "DEBUG":
-			logging.basicConfig(filename=path, level=logging.DEBUG, format=log_format)
-		elif level.upper() == "INFO":
-			logging.basicConfig(filename=path, level=logging.INFO, format=log_format)
-		elif level.upper() == "WARNING":
-			logging.basicConfig(filename=path, level=logging.WARNING, format=log_format)
-		elif level.upper() == "ERROR":
-			logging.basicConfig(filename=path, level=logging.ERROR, format=log_format)
-		else:
-			logging.basicConfig(filename=path, level=logging.DEBUG, format=log_format)
-		return logging.getLogger()
-	except Exception as ex:
-		print(f"Could not setup the logger, exiting the program.\nError: {ex}")
-		sys.exit(1)
-
-
 class Job:
 	def __init__(self, max_jobs):
-		MAX_JOBS = max_jobs
+		self.MAX_JOBS = max_jobs
 
 
 	def getRegisteredJobs(self, data):
@@ -71,7 +25,7 @@ class Job:
 			the controller to function.
 		:param self: [INT] self.MAX_JOBS
 		:param data: [DICT] dict of all jobs in settings.json
-		:return [ARRAY]: job id's of registered jobs eg. [1,2,3,4,...]
+		:return: [ARRAY] job id's of registered jobs eg. [1,2,3,4,...]
 						 if this fails, reutrns [BOOL] -> False
 		"""
 		i = 0
@@ -85,16 +39,37 @@ class Job:
 		return reg_jobs
 
 	
+	def getJobData(self, data, job_id):
+		"""
+		Get the data from a given job_id and return it for futher usage.
+		:param self:
+		:param data: [DICT] all the gathered data
+		:param job_id: [INT] the id for the job to be loaded
+		:return: [DICT] all the information stored for job with given job_id
+		"""
+		return data[job_id]
+
+
 	def jobController(self, data):
 		"""
 		Load the requested job from the passed data dict.
 		:param self: 
 		:param data: [DICT] dict of all jobs in settings.json
 		:param job_id: [INT] 
+		:return: [BOOL] if successfull or not
 		"""
 		err = False
-		job_ids = getRegisteredJobs(data)	# Get all registered jobs (ARRAY).
-	
+		job_ids = Job.getRegisteredJobs(self, data)	# Get all registered jobs.
+		if type(job_ids) == list:
+			for id in job_ids:
+				job = Job.getJobData(self, data['jobs'], id)
+				if not Job.isUp(self, job['name']):
+					# The job is inactive, try starting it!
+					pass
+		else:
+			logger.error(f"Retrieved job_ids are not accuratly formatted.. [{job_ids}]")
+			err = True
+
 		if err:
 			return False
 		return True
@@ -145,6 +120,52 @@ class Program:
 			sys.exit(1)
 
 
+def readJson(path):
+	"""
+	Read the passed json file and return the content (dict).
+	"""
+	data = False
+	if not os.path.exists(path):
+		# File does not exist.
+		logger.error(f"File does not exist, please make sure the path is correct and the file exists.. [{path}]")
+	else:
+		# Check if the file is empty.
+		if os.stat(path).st_size == 0:
+			# The file is empty..
+			logger.error(f"File is empty, please check the content or given file.. [{path}]")
+		else:
+			try:
+				# Open the file and read the content to data.
+				with open(path, "r") as file:
+					data = json.load(file)
+			except IOError as io:
+				logger.error(f"File is currently busy, please close the json file and try it again. [{path}]")
+			except Exception as ex:
+				logger.error(f"Something unexpected happened, please try again.\nError: {ex}", 1)
+	return data
+
+
+def setup_logger(level, path):
+	# Change the logging format below..
+	log_format = "%(asctime)s - %(levelname)s - %(message)s"
+	try:
+		# Check the different cases, default: DEBUG
+		if level.upper() == "DEBUG":
+			logging.basicConfig(filename=path, level=logging.DEBUG, format=log_format)
+		elif level.upper() == "INFO":
+			logging.basicConfig(filename=path, level=logging.INFO, format=log_format)
+		elif level.upper() == "WARNING":
+			logging.basicConfig(filename=path, level=logging.WARNING, format=log_format)
+		elif level.upper() == "ERROR":
+			logging.basicConfig(filename=path, level=logging.ERROR, format=log_format)
+		else:
+			logging.basicConfig(filename=path, level=logging.DEBUG, format=log_format)
+		return logging.getLogger()
+	except Exception as ex:
+		print(f"Could not setup the logger, exiting the program.\nError: {ex}")
+		sys.exit(1)
+
+
 if __name__ == '__main__':
 	# Toggle DEBUG mode.
 	DEBUG = True
@@ -168,13 +189,13 @@ if __name__ == '__main__':
 			"MAX_JOBS": 5
 		}
 
-	logger = setup_logger(settings[0], settings[1])
-	logger.debug(f"[SYSTEM_INFO]\nHOME_DIR: {HOME_DIR}\nDEBUGGING: {str(DEBUG)}\nLOG_LEVEL: {settings[0]}\nLOGGING_PATH: {settings[1]}\nSETTINGS_PATH: {settings[2]}\nMAX_JOBS: {settings[3]}")
+	logger = setup_logger(settings['LOG_LEVEL'], settings['LOGGING_PATH'])
+	logger.debug(f"[SYSTEM_INFO]\nHOME_DIR: {HOME_DIR}\nDEBUGGING: {str(DEBUG)}\nLOG_LEVEL: {settings['LOG_LEVEL']}\nLOGGING_PATH: {settings['LOGGING_PATH']}\nSETTINGS_PATH: {settings['SETTINGS_PATH']}\nMAX_JOBS: {settings['MAX_JOBS']}")
 
 	# Initialize the program and start it.
 	prog = Program(
-		settings[2], 
-		settings[3],
+		settings['SETTINGS_PATH'], 
+		settings['MAX_JOBS'],
 		HOME_DIR
 	)
 	prog.start()
