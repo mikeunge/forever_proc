@@ -14,65 +14,89 @@ from pathlib import Path
 
 
 class Job:
-	def __init__(self, max_jobs):
+	def __init__(self, max_jobs, data):
 		self.MAX_JOBS = max_jobs
+		self.REG_JOBS = []
+		self.JOB_DATA = data
 
 
-	def getRegisteredJobs(self, data):
+	def registerJobs(self):
 		"""
-		Destruct the passed data to get all the registered jobs.
-		Loop over the 'jobs' DOM and extract all registered job ids, the numbers are trivial for
-			the controller to function.
-		:param self: [INT] self.MAX_JOBS
-		:param data: [DICT] dict of all jobs in settings.json
-		:return: [ARRAY] job id's of registered jobs eg. [1,2,3,4,...]
-						 if this fails, reutrns [BOOL] -> False
+		Loop over the given dataset (self.JOB_DATA) and extract all the exiting/registered jobs.
+		The job_ids are then stored in the self.REG_JOBS variable for further process.
 		"""
 		i = 0
-		reg_jobs = []
-		for job_id in data['jobs']:
+		for id in self.JOB_DATA:
 			i += 1
-			reg_jobs.append(job_id)
-			if i == self.MAX_JOBS:
+			self.REG_JOBS.append(id)
+			if i == self.MAX_JOBS:		# Check if MAX_JOBS is reached or not.
 				break
-		# Return array of registered jobs.
-		return reg_jobs
-
-	
-	def getJobData(self, data, job_id):
-		"""
-		Get the data from a given job_id and return it for futher usage.
-		:param self:
-		:param data: [DICT] all the gathered data
-		:param job_id: [INT] the id for the job to be loaded
-		:return: [DICT] all the information stored for job with given job_id
-		"""
-		return data[job_id]
 
 
-	def jobController(self, data):
+	def jobController(self):
 		"""
-		Load the requested job from the passed data dict.
-		:param self: 
-		:param data: [DICT] dict of all jobs in settings.json
-		:param job_id: [INT] 
-		:return: [BOOL] if successfull or not
+		This is the "main" function of the "Job" class.
+		It initializes all the different components and controlls the further workflow and logic.
 		"""
 		err = False
-		job_ids = Job.getRegisteredJobs(self, data)	# Get all registered jobs.
-		if type(job_ids) == list:
-			for id in job_ids:
-				job = Job.getJobData(self, data['jobs'], id)
-				if not Job.isUp(self, job['name']):
-					# The job is inactive, try starting it!
-					pass
-		else:
-			logger.error(f"Retrieved job_ids are not accuratly formatted.. [{job_ids}]")
-			err = True
-
+		self.registerJobs()	# Get all registered jobs.
+		logger.debug(f"Registered jobs: {self.REG_JOBS}")
+		for id in self.REG_JOBS:
+			job = self.JOB_DATA[id]
+			logger.debug(f"Job [{id}] Data: {job}")
+			if not self.isUp(job['name']):
+				# The job is inactive, try starting it!
+				logger.info(f"Trying to start the job. [{job['name']}]")
+				if not self.startJob(id):	# Check if the job execution works.
+					logger.error(f"Could not start the job [{job['name']}].")
+					err = True		# Set error to true..
+				else:
+					logger.info(f"Successfully startet process {job['name']}!")
 		if err:
 			return False
 		return True
+
+
+	def startJob(self, job_id):
+		"""
+		Try to start a new forever processor job.
+		"""
+		try:
+			job = self.JOB_DATA[job_id]		# Initialize the job.
+		except Exception as ex:
+			logger.error(f"Could not initialize data set..\nError: {ex}")
+		try:
+			# Map the job data to variables.
+			name = job['name']
+			start = job['start']
+			log = job['log_path']
+		except Exception as ex:
+			logger.error(f"Could not load data..\nError: {ex}")
+			return False
+
+		# Get the last character from the log path.
+		# If last char is not "/", it gets added.
+		log_last_char = log[-1]
+		if log_last_char != "/":
+			logger.debug(f"Logging path is missing '/' at the end.. Correcting the path.")
+			log += "/"
+
+		# Create the different log paths.
+		out_log = log + name + ".out.log"
+		err_log = log + name + ".err.log"
+		log = log + name + ".log"
+
+		# Construct the forever command.
+		cmd = f"forever start -s -a -l {log} -o {out_log} -e {err_log} {start} >> /dev/null"
+		try:
+			out = os.system(cmd)
+			logger.debug(f"Executing command: {cmd}\nOutput: {out}")
+			if out != 0:
+				return False
+			return True
+		except Exception as ex:
+			logger.error(f"Something went wrong while creating forever processes..\nError: {ex}")
+			return False
 
 
 	def isUp(self, job):
@@ -109,15 +133,20 @@ class Program:
 		# Read the settings file.
 		data = readJson(self.SETTINGS)
 		if type(data) == dict:
-			job = Job(self.MAX_JOBS)
-			job.jobController(data)
-
-			# DEBUG
-			sys.exit(0)
+			try:
+				# Try to initialize the Job class.
+				job = Job(self.MAX_JOBS, data['jobs'])
+			except Exception as ex:
+				logger.error(f"Could not initialize the jobs..\nError: {ex}")
+			
+			if not job.jobController():
+				logger.error("jobController has returned with errors. Please check the logs for more information.")
+				return False
 		else:
-			# Data is corrupt/not valid json formatted..
+			# Data is corrupt/not vaslid json formatted..
 			logger.error(f"Data is not a valid format or corrupt, please check logs for more information..")
-			sys.exit(1)
+			return False
+		return True
 
 
 def readJson(path):
@@ -198,5 +227,11 @@ if __name__ == '__main__':
 		settings['MAX_JOBS'],
 		HOME_DIR
 	)
-	prog.start()
+	logger.info("--- Script started ---")
+
+	if not prog.start():
+		logger.info("--- Script exits : code 1 ---")
+		sys.exit(1)
+
+	logger.info("--- Script exits : code 0 ---")
 	sys.exit(0)
