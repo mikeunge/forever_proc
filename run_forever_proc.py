@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 #-*- coding: utf-8 -*-
 #
-# This script starts forever pods.
-# Forever lets you run (mainly js) scripts or bots as daemons.
+# This script starts pre-defined forever jobs.
+# To fit this script to your needs, change the jobs in the 'settings.json' file.
+# If you want to toggle the debug mode or change some paths, scroll to the end of this script.
+# After modifying the script, just run 'python3 run_forever_proc.py' to execute it.
 #
-# Example:
-# forever start -l forever.log -o out.log -e err.log my-daemon.js
 import os
 import sys
 import json
@@ -197,7 +197,7 @@ def setup_logger(level, path):
 
 if __name__ == '__main__':
 	# Toggle DEBUG mode.
-	DEBUG = True
+	DEBUG = False
 
 	# Get the current users home directory.
 	HOME_DIR = str(Path.home())
@@ -214,7 +214,7 @@ if __name__ == '__main__':
 		settings = {
 			"LOG_LEVEL": "INFO",
 			"LOGGING_PATH": f"{HOME_DIR}/forever_proc.log",
-			"SETTINGS_PATH": f"{HOME_DIR}/.config/forever_proc/settings.json",
+			"SETTINGS_PATH": f"./settings.json",
 			"MAX_JOBS": 5
 		}
 
