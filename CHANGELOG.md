@@ -21,6 +21,8 @@ This is the **first** stable release of the *forever_proc* script!
 - "*log*" is now "*log_path*" in **settings.json**
 - "*start*" workflow and behaviour; outsourced most of it's functionallity
 - "*jobControl*" workflow 
+- **README.md** got a *Usage* section
+- Disabled **DEBUG** mode in "*PROD*"
 
 
 
